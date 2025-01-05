@@ -49,10 +49,10 @@ public class Drive extends SubsystemBase {
       Math.hypot(TRACK_WIDTH_X / 2.0, TRACK_WIDTH_Y / 2.0);
   private static final double MAX_ANGULAR_SPEED = MAX_LINEAR_SPEED / DRIVE_BASE_RADIUS;
 
-  private final GyroIO gyroIO;
+  private  GyroIO gyroIO;
   private final GyroIOInputs gyroInputs = new GyroIOInputs();
-  private final Module[] modules = new Module[4]; // FL, FR, BL, BR
-  private final SysIdRoutine sysId;
+  private  Module[] modules = new Module[4]; // FL, FR, BL, BR
+  // private final SysIdRoutine sysId;
 
   private SwerveDriveKinematics kinematics = new SwerveDriveKinematics(getModuleTranslations());
   private Rotation2d rawGyroRotation = new Rotation2d();
@@ -65,6 +65,11 @@ public class Drive extends SubsystemBase {
       };
   private SwerveDrivePoseEstimator poseEstimator =
       new SwerveDrivePoseEstimator(kinematics, rawGyroRotation, lastModulePositions, new Pose2d());
+    
+      
+
+      
+       
 
   public Drive(
       GyroIO gyroIO,
@@ -95,13 +100,15 @@ public class Drive extends SubsystemBase {
         config = RobotConfig.fromGUISettings();
         } catch (Exception e) {
         // Handle exception as needed
+        config = null;
         e.printStackTrace();
         }
+
         AutoBuilder.configure(
             this::getPose, // Robot pose supplier
             this::setPose, // Method to reset odometry (will be called if your auto has a starting pose)
             this::getRobotRelativeSpeeds, // ChassisSpeeds supplier. MUST BE ROBOT RELATIVE
-            (speeds, feedforwards) -> driveRobotRelative(speeds), // Method that will drive the robot given ROBOT RELATIVE ChassisSpeeds. Also optionally outputs individual module feedforwards
+            (speeds, feedforwards) -> runVelocity(speeds), // Method that will drive the robot given ROBOT RELATIVE ChassisSpeeds. Also optionally outputs individual module feedforwards
             new PPHolonomicDriveController( // PPHolonomicController is the built in path following controller for holonomic drive trains
                     new PIDConstants(5.0, 0.0, 0.0), // Translation PID constants
                     new PIDConstants(5.0, 0.0, 0.0) // Rotation PID constants
@@ -119,7 +126,9 @@ public class Drive extends SubsystemBase {
               return false;
             },
             this // Reference to this subsystem to set requirements
-        );    
+        );}; 
+        
+        
     // Pathfinding.setPathfinder(new LocalADStarAK());
     // PathPlannerLogging.setLogActivePathCallback(
     //     (activePath) -> {
@@ -236,14 +245,14 @@ public class Drive extends SubsystemBase {
   }
 
   /** Returns a command to run a quasistatic test in the specified direction. */
-  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
-    return sysId.quasistatic(direction);
-  }
+  // public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+  //   return sysId.quasistatic(direction);
+  // }
 
-  /** Returns a command to run a dynamic test in the specified direction. */
-  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
-    return sysId.dynamic(direction);
-  }
+  // /** Returns a command to run a dynamic test in the specified direction. */
+  // public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+  //   return sysId.dynamic(direction);
+  // }
 
   /** Returns the module states (turn angles and drive velocities) for all of the modules. */
 //   @AutoLogOutput(key = "SwerveStates/Measured")
@@ -312,5 +321,8 @@ public class Drive extends SubsystemBase {
 
   public ChassisSpeeds getRobotRelativeSpeeds() {
     ChassisSpeeds chassisSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(kinematics.toChassisSpeeds(getModuleStates()), getRotation());
+    return chassisSpeeds;
   }
+
+  
 }
