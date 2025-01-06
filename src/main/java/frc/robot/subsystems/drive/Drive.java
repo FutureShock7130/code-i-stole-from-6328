@@ -33,12 +33,17 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.units.VoltageUnit;
+import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.subsystems.drive.GyroIO.GyroIOInputs;
+import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.Logger;
 
 
 public class Drive extends SubsystemBase {
@@ -141,29 +146,28 @@ public class Drive extends SubsystemBase {
     //     });
 
     // Configure SysId
-//     sysId =
-//         new SysIdRoutine(
-//             new SysIdRoutine.Config(
-//                 null,
-//                 null,
-//                 null,
-//                 (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
-//             new SysIdRoutine.Mechanism(
-//                 (voltage) -> {
-//                   for (int i = 0; i < 4; i++) {
-//                     modules[i].runCharacterization(voltage.in(Volts));
-//                   }
-//                 },
-//                 null,
-//                 this));
-//   }
+  //   sysId = new SysIdRoutine(
+  //           new SysIdRoutine.Config(
+  //               null,
+  //               null,
+  //               null,
+  //               (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
+  //           new SysIdRoutine.Mechanism(
+  //               (voltage) -> {
+  //                 for (int i = 0; i < 4; i++) {
+  //                   modules[i].runCharacterization(12);
+  //                 }
+  //               },
+  //               null,
+  //               this));
+  // }
 
   public void periodic() {
     gyroIO.updateInputs(gyroInputs);
-    // Logger.processInputs("Drive/Gyro", gyroInputs);
-    // for (var module : modules) {
-    //   module.periodic();
-    // }
+    Logger.processInputs("Drive/Gyro", gyroInputs);
+    for (var module : modules) {
+      module.periodic();
+    }
 
     // Stop moving when disabled
     if (DriverStation.isDisabled()) {
@@ -172,10 +176,10 @@ public class Drive extends SubsystemBase {
       }
     }
     // Log empty setpoint states when disabled
-    // if (DriverStation.isDisabled()) {
-    //   Logger.recordOutput("SwerveStates/Setpoints", new SwerveModuleState[] {});
-    //   Logger.recordOutput("SwerveStates/SetpointsOptimized", new SwerveModuleState[] {});
-    // }
+    if (DriverStation.isDisabled()) {
+      Logger.recordOutput("SwerveStates/Setpoints", new SwerveModuleState[] {});
+      Logger.recordOutput("SwerveStates/SetpointsOptimized", new SwerveModuleState[] {});
+    }
 
     // Read wheel positions and deltas from each module
     SwerveModulePosition[] modulePositions = getModulePositions();
@@ -200,6 +204,7 @@ public class Drive extends SubsystemBase {
     }
 
     // Apply odometry update
+    
     poseEstimator.update(rawGyroRotation, modulePositions);
   }
 
