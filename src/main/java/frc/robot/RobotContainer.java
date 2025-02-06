@@ -27,12 +27,13 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.commands.Datalogtester;
 import frc.robot.commands.move1m;
+import frc.robot.commands.TurnToAngle;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.GyroIO;
 import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
-
 import frc.robot.subsystems.drive.Swerve;
+import frc.robot.Vision;
 
 // import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 // import org.littletonrobotics.junction.networktables.LoggedDashboardNumber;
@@ -46,6 +47,7 @@ import frc.robot.subsystems.drive.Swerve;
 public class RobotContainer {
   // Subsystems
   private final Drive drive;
+  private final Vision vision = new Vision();
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -66,7 +68,8 @@ public class RobotContainer {
                 new Swerve(0),
                 new Swerve(1),
                 new Swerve(2),
-                new Swerve(3));
+                new Swerve(3),
+                vision);
 
         break;
 
@@ -89,7 +92,8 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {},
                 new ModuleIO() {},
-                new ModuleIO() {});
+                new ModuleIO() {},
+                vision);
         break;
     }
 
@@ -117,6 +121,14 @@ public class RobotContainer {
     
     // Add Datalogtester button to SmartDashboard! ʕ•ᴥ•ʔ
     SmartDashboard.putData("Run Feedforward Test!", new Datalogtester(drive));
+    
+    // Add turn-to-angle buttons! ʕ•ᴥ•ʔ
+    SmartDashboard.putData("Turn 0°", new TurnToAngle(drive, 0));
+    SmartDashboard.putData("Turn 60°", new TurnToAngle(drive, 60));
+    SmartDashboard.putData("Turn 120°", new TurnToAngle(drive, 120));
+    SmartDashboard.putData("Turn 180°", new TurnToAngle(drive, 180));
+    SmartDashboard.putData("Turn 240°", new TurnToAngle(drive, 240));
+    SmartDashboard.putData("Turn 300°", new TurnToAngle(drive, 300));
   }
 
   /**

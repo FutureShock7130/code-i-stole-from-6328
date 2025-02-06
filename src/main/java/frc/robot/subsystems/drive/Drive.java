@@ -1,4 +1,3 @@
-
 package frc.robot.subsystems.drive;
 
 import static edu.wpi.first.units.Units.*;
@@ -31,10 +30,12 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.robot.Vision;
 import frc.robot.subsystems.drive.GyroIO.GyroIOInputs;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.AutoLogOutputManager;
 import org.littletonrobotics.junction.Logger;
+import org.photonvision.estimation.VisionEstimation;
 
 
 public class Drive extends SubsystemBase {
@@ -46,6 +47,8 @@ public class Drive extends SubsystemBase {
   private static final double MAX_ANGULAR_SPEED = MAX_LINEAR_SPEED / DRIVE_BASE_RADIUS;
 
   private Field2d odoField2d = new Field2d();
+
+  private final Pose2d photonPose2d = new Pose2d();
 
   private  GyroIO gyroIO;
   private final GyroIOInputs gyroInputs = new GyroIOInputs();
@@ -78,18 +81,17 @@ public class Drive extends SubsystemBase {
   private SwerveDrivePoseEstimator poseEstimator =
       new SwerveDrivePoseEstimator(kinematics, rawGyroRotation, lastModulePositions, new Pose2d());
     
-      
-
-      
-       
+  private final Vision vision;
 
   public Drive(
       GyroIO gyroIO,
       ModuleIO flModuleIO,
       ModuleIO frModuleIO,
       ModuleIO blModuleIO,
-      ModuleIO brModuleIO) {
+      ModuleIO brModuleIO,
+      Vision vision) {
     this.gyroIO = gyroIO;
+    this.vision = vision;
     modules[0] = new Module(flModuleIO, 0);
     modules[1] = new Module(frModuleIO, 1);
     modules[2] = new Module(blModuleIO, 2);
@@ -215,6 +217,16 @@ public class Drive extends SubsystemBase {
     poseEstimator.update(rawGyroRotation, modulePositions);
     odoField2d.setRobotPose(poseEstimator.getEstimatedPosition());
     SmartDashboard.putData("nig", odoField2d);
+
+    // Update pose estimator with vision data! >w<
+    Pose2d visionPose = vision.getLatestPose();
+    if (visionPose != null) {
+      // Add vision measurement with a timestamp UwU
+      poseEstimator.addVisionMeasurement(
+          visionPose,
+          Timer.getFPGATimestamp()
+      );
+    }
   }
 
   /**
