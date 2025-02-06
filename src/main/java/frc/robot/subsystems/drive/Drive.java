@@ -26,26 +26,45 @@ import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.subsystems.drive.GyroIO.GyroIOInputs;
 import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.AutoLogOutputManager;
 import org.littletonrobotics.junction.Logger;
 
 
 public class Drive extends SubsystemBase {
-  private static final double MAX_LINEAR_SPEED = Units.feetToMeters(14.5);
+  private static final double MAX_LINEAR_SPEED = 4;
   private static final double TRACK_WIDTH_X = Units.inchesToMeters(25.0);
   private static final double TRACK_WIDTH_Y = Units.inchesToMeters(25.0);
   private static final double DRIVE_BASE_RADIUS =
       Math.hypot(TRACK_WIDTH_X / 2.0, TRACK_WIDTH_Y / 2.0);
   private static final double MAX_ANGULAR_SPEED = MAX_LINEAR_SPEED / DRIVE_BASE_RADIUS;
 
+  private Field2d odoField2d = new Field2d();
+
   private  GyroIO gyroIO;
   private final GyroIOInputs gyroInputs = new GyroIOInputs();
+  
   private  Module[] modules = new Module[4]; // FL, FR, BL, BR
-  // private final SysIdRoutine sysId;
+  private final SysIdRoutine sysId = new SysIdRoutine(
+    new SysIdRoutine.Config(
+        null,
+        null,
+        null,
+        (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
+    new SysIdRoutine.Mechanism(
+        (voltage) -> {
+          for (int i = 0; i < 4; i++) {
+            modules[i].runCharacterization(12);
+          }
+        },
+        null,
+        this));
 
   private SwerveDriveKinematics kinematics = new SwerveDriveKinematics(getModuleTranslations());
   private Rotation2d rawGyroRotation = new Rotation2d();
@@ -134,21 +153,21 @@ public class Drive extends SubsystemBase {
     //     });
 
     // Configure SysId
-  //   sysId = new SysIdRoutine(
-  //           new SysIdRoutine.Config(
-  //               null,
-  //               null,
-  //               null,
-  //               (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
-  //           new SysIdRoutine.Mechanism(
-  //               (voltage) -> {
-  //                 for (int i = 0; i < 4; i++) {
-  //                   modules[i].runCharacterization(12);
-  //                 }
-  //               },
-  //               null,
-  //               this));
-  // }
+    // Sysid = new SysIdRoutine(
+    //         new SysIdRoutine.Config(
+    //             null,
+    //             null,
+    //             null,
+    //             (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
+    //         new SysIdRoutine.Mechanism(
+    //             (voltage) -> {
+    //               for (int i = 0; i < 4; i++) {
+    //                 modules[i].runCharacterization(12);
+    //               }
+    //             },
+    //             null,
+    //             this));
+    
 
   public void periodic() {
     gyroIO.updateInputs(gyroInputs);
@@ -194,6 +213,8 @@ public class Drive extends SubsystemBase {
     // Apply odometry update
     
     poseEstimator.update(rawGyroRotation, modulePositions);
+    odoField2d.setRobotPose(poseEstimator.getEstimatedPosition());
+    SmartDashboard.putData("nig", odoField2d);
   }
 
   /**
@@ -215,8 +236,8 @@ public class Drive extends SubsystemBase {
     }
 
     // Log setpoint states
-    // Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
-    // Logger.recordOutput("SwerveStates/SetpointsOptimized", optimizedSetpointStates);
+    Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
+    Logger.recordOutput("SwerveStates/SetpointsOptimized", optimizedSetpointStates);
   }
 
   /** Stops the drive. */
@@ -238,14 +259,14 @@ public class Drive extends SubsystemBase {
   }
 
   /** Returns a command to run a quasistatic test in the specified direction. */
-  // public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
-  //   return sysId.quasistatic(direction);
-  // }
+  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+    return sysId.quasistatic(direction);
+  }
 
   // /** Returns a command to run a dynamic test in the specified direction. */
-  // public Command sysIdDynamic(SysIdRoutine.Direction direction) {
-  //   return sysId.dynamic(direction);
-  // }
+  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+    return sysId.dynamic(direction);
+  }
 
   /** Returns the module states (turn angles and drive velocities) for all of the modules. */
 //   @AutoLogOutput(key = "SwerveStates/Measured")
@@ -318,4 +339,7 @@ public class Drive extends SubsystemBase {
   }
 
   
+  public void end(boolean interrupted) {
+      setPose(new Pose2d(new Translation2d() , new Rotation2d()));
+  }
 }

@@ -18,6 +18,7 @@ public class DriveCommands {
   private static final double DEADBAND = 0.1;
 
   private DriveCommands() {}
+  
 
   /**
    * Field relative drive command using two joysticks (controlling linear and angular velocities).
@@ -53,13 +54,15 @@ public class DriveCommands {
                   && DriverStation.getAlliance().get() == Alliance.Red;
           drive.runVelocity(
               ChassisSpeeds.fromFieldRelativeSpeeds(
-                  linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
-                  linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
-                  omega * drive.getMaxAngularSpeedRadPerSec(),
+                  linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec() * 0.3,
+                  linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec() * 0.3,
+                  omega * drive.getMaxAngularSpeedRadPerSec() * 0.3,
                   isFlipped
                       ? drive.getRotation().plus(new Rotation2d(Math.PI))
                       : drive.getRotation()));
         },
         drive);
   }
+
+    
 }
