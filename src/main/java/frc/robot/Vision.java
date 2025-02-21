@@ -8,9 +8,19 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.EnumSet;
+import java.util.HashMap;
+
 import org.photonvision.EstimatedRobotPose;
 import org.photonvision.PhotonCamera;
 import org.photonvision.PhotonPoseEstimator;
@@ -19,22 +29,75 @@ import org.photonvision.simulation.PhotonCameraSim;
 import org.photonvision.simulation.SimCameraProperties;
 import org.photonvision.simulation.VisionSystemSim;
 import org.photonvision.targeting.PhotonTrackedTarget;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.NetworkTableEvent;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
-public class Vision {
-    private final PhotonCamera camera;
-    private final PhotonPoseEstimator photonEstimator;
+public class Vision extends SubsystemBase {
+    private final Map<String, PhotonCamera> cameras;
+    private final Map<String, PhotonPoseEstimator> photonEstimators;
+    private String currentCamera;
     private Matrix<N3, N1> curStdDevs;
 
     // Simulation
     private PhotonCameraSim cameraSim;
     private VisionSystemSim visionSim;
 
+    private SendableChooser<String> cameraChooser;
+    
     public Vision() {
-        camera = new PhotonCamera(kCameraName);
-
-        photonEstimator =
-                new PhotonPoseEstimator(kTagLayout, PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, kRobotToCam);
-        photonEstimator.setMultiTagFallbackStrategy(PoseStrategy.LOWEST_AMBIGUITY);
+        cameras = new HashMap<>();
+        photonEstimators = new HashMap<>();
+        
+        // Define transforms for each camera
+        Map<String, Transform3d> robotToCamTransforms = new HashMap<>();
+        robotToCamTransforms.put("CAM_1", new Transform3d(
+            new Translation3d(0.3, 0.25, 0.20),  // right camera
+            new Rotation3d(0.0, Math.toRadians(0), 0.0))); 
+            
+        robotToCamTransforms.put("CAM_2", new Transform3d(
+            new Translation3d(0, 0, 0),  // left camera
+            new Rotation3d(0.0, Math.toRadians(0), Math.toRadians(0)))); 
+            
+        robotToCamTransforms.put("CAM_3", new Transform3d(
+            new Translation3d(0, 0, 0),  // top camera
+            new Rotation3d(0.0, Math.toRadians(0), 0.0))); 
+        
+        // Create cameras and estimators with their specific transforms 
+        for (Map.Entry<String, Transform3d> entry : robotToCamTransforms.entrySet()) {
+            String name = entry.getKey();
+            Transform3d transform = entry.getValue();
+            
+            cameras.put(name, new PhotonCamera(name));
+            photonEstimators.put(name, 
+                new PhotonPoseEstimator(kTagLayout, PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, 
+                    transform));
+        }
+        
+        currentCamera = "CAM_1"; // Start with first camera
+        
+        // Add camera selector to Shuffleboard 
+        ShuffleboardTab visionTab = Shuffleboard.getTab("Vision");
+        cameraChooser = new SendableChooser<>();
+        for (String name : cameras.keySet()) {
+            cameraChooser.addOption(name, name);
+        }
+        visionTab.add("Camera Selection", cameraChooser)
+            .withSize(2, 1)
+            .withPosition(0, 0);
+            
+        // Listen for camera selection changes
+        NetworkTableInstance.getDefault()
+            .getTable("SmartDashboard")
+            .getSubTable("Camera Selection")
+            .addListener(
+                EnumSet.of(NetworkTableEvent.Kind.kValueAll), 
+                (table, key, event) -> 
+                    currentCamera = cameraChooser.getSelected());
 
         // ----- Simulation
         if (Robot.isSimulation()) {
@@ -51,9 +114,9 @@ public class Vision {
             cameraProp.setLatencyStdDevMs(15);
             // Create a PhotonCameraSim which will update the linked PhotonCamera's values with visible
             // targets.
-            cameraSim = new PhotonCameraSim(camera, cameraProp);
+            cameraSim = new PhotonCameraSim(cameras.get(currentCamera), cameraProp);
             // Add the simulated camera to view the targets on this simulated field.
-            visionSim.addCamera(cameraSim, kRobotToCam);
+            visionSim.addCamera(cameraSim, robotToCamTransforms.get(currentCamera));
 
             cameraSim.enableDrawWireframe(true);
         }
@@ -70,12 +133,14 @@ public class Vision {
      *     used for estimation.
      */
     public Optional<EstimatedRobotPose> getEstimatedGlobalPose() {
+        // Use current selected camera UwU
+        PhotonCamera camera = cameras.get(currentCamera);
+        PhotonPoseEstimator estimator = photonEstimators.get(currentCamera);
+        
         Optional<EstimatedRobotPose> visionEst = Optional.empty();
         for (var change : camera.getAllUnreadResults()) {
-            visionEst = photonEstimator.update(change);
+            visionEst = estimator.update(change);
             updateEstimationStdDevs(visionEst, change.getTargets());
-
-            
         }
         return visionEst;
     }
@@ -101,7 +166,7 @@ public class Vision {
 
             // Precalculation - see how many tags we found, and calculate an average-distance metric
             for (var tgt : targets) {
-                var tagPose = photonEstimator.getFieldTags().getTagPose(tgt.getFiducialId());
+                var tagPose = photonEstimators.get(currentCamera).getFieldTags().getTagPose(tgt.getFiducialId());
                 if (tagPose.isEmpty()) continue;
                 numTags++;
                 avgDist +=
@@ -169,5 +234,48 @@ public class Vision {
         }
         
         return null; // No valid pose found ʕ•ᴥ•ʔ
+    }
+
+    /**
+     * Gets the 3D translation to the best AprilTag currently visible UwU
+     * @return Translation3d to the tag, or null if no tag is visible
+     */
+    public Translation3d getTagTranslation() {
+        PhotonCamera camera = cameras.get(currentCamera);
+        var result = camera.getLatestResult();
+        
+        // Check if we have any targets ʕ•ᴥ•ʔ
+        if (result.hasTargets()) {
+            // Get best target (closest to camera center)
+            PhotonTrackedTarget target = result.getBestTarget();
+            
+            // Get the transform to the target
+            Transform3d targetTransform = target.getBestCameraToTarget();
+            return targetTransform.getTranslation();
+        }
+        
+        return null;  // No targets found (╥﹏╥)
+    }
+
+    @Override
+    public void periodic() {
+        // Update camera selection if needed
+        String selected = cameraChooser.getSelected();
+        if (selected != null && selected != currentCamera) {
+            currentCamera = selected;
+        }
+
+        // Put tag translation on dashboard ✨
+        Translation3d tagTranslation = getTagTranslation();
+        if (tagTranslation != null) {
+            SmartDashboard.putNumber("Tag/X Distance (m)", tagTranslation.getX());
+            SmartDashboard.putNumber("Tag/Y Distance (m)", tagTranslation.getY());
+            SmartDashboard.putNumber("Tag/Z Distance (m)", tagTranslation.getZ());
+        } else {
+            // Clear values when no tag is visible UwU
+            SmartDashboard.putNumber("Tag/X Distance (m)", 0.0);
+            SmartDashboard.putNumber("Tag/Y Distance (m)", 0.0);
+            SmartDashboard.putNumber("Tag/Z Distance (m)", 0.0);
+        }
     }
 }

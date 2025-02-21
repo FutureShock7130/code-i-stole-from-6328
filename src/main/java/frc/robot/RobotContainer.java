@@ -14,8 +14,11 @@
 package frc.robot;
 
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.commands.PathPlannerAuto;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -34,6 +37,8 @@ import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.Swerve;
 import frc.robot.Vision;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 
 // import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 // import org.littletonrobotics.junction.networktables.LoggedDashboardNumber;
@@ -101,20 +106,24 @@ public class RobotContainer {
 
     autoChooser = AutoBuilder.buildAutoChooser();
 
+    autoChooser.setDefaultOption("leave", new PathPlannerAuto("LEAVE"));
+    autoChooser.addOption("full auto", new PathPlannerAuto("FullAuto"));
     // Set up SysId routines
-    // autoChooser.addOption(
-    //     "Drive SysId (Quasistatic Forward)",
-    //     drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-    // autoChooser.addOption(
-    //     "Drive SysId (Quasistatic Reverse)",
-    //     drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-    // autoChooser.addOption(
-    //     "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
-    // autoChooser.addOption(
-    //     "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
+    autoChooser.addOption(
+        "Drive SysId (Quasistatic Forward)",
+        drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
+    autoChooser.addOption(
+        "Drive SysId (Quasistatic Reverse)",
+        drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
+    autoChooser.addOption(
+        "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
+    autoChooser.addOption(
+        "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
 
     // Configure the button bindings
     configureButtonBindings();
+
+    SmartDashboard.putData("auto", autoChooser);
 
     // Add move1m command button to SmartDashboard! >w<
     SmartDashboard.putData("Move 1 meter forward!", new move1m(drive));
@@ -129,6 +138,13 @@ public class RobotContainer {
     SmartDashboard.putData("Turn 180°", new TurnToAngle(drive, 180));
     SmartDashboard.putData("Turn 240°", new TurnToAngle(drive, 240));
     SmartDashboard.putData("Turn 300°", new TurnToAngle(drive, 300));
+
+    // Add our kawaii reset button! ✧˖°
+    ShuffleboardTab driveTab = Shuffleboard.getTab("Drive");
+    driveTab.add("Reset Pose/Gyro", Commands.runOnce(() -> drive.resetPoseToZero()))
+        .withSize(2, 1)
+        .withPosition(0, 0);
+    
   }
 
   /**
@@ -146,7 +162,7 @@ public class RobotContainer {
             () -> -controller.getRightX()));
     controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
     controller
-        .b()
+        .back()
         .onTrue(
             Commands.runOnce(
                     () ->
@@ -162,6 +178,7 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
+    drive.setPose(new Pose2d());
     return autoChooser.getSelected();
   }
 }
